@@ -95,6 +95,12 @@ static byte player_screen_y = 0;
 // score (BCD)
 static byte score = 0;
 
+static byte score1 = 0;
+
+static byte score2 = 0;
+
+static byte score3 = 0;
+
 // screen flash animation (virtual bright)
 static byte vbright = 4;
 
@@ -215,21 +221,13 @@ bool ladder_in_gap(byte x, byte gap) {
 // create floors at start of game
 void make_floors() {
   byte i;
+  
   byte y = BOTTOM_FLOOR_Y;
   Floor* prevlev = &floors[0];
   for (i=0; i<MAX_FLOORS; i++) {
     Floor* lev = &floors[i];
     lev->height = rndint(2,5)*2;
-    do {
-      // only have gaps in higher floors
-      lev->gap = i>=2 ? rndint(0,6) : 0;
-    } while (ladder_in_gap(prevlev->ladder1, lev->gap) || 
-             ladder_in_gap(prevlev->ladder2, lev->gap));
-    do {
-      lev->ladder1 = rndint(1,14);
-      lev->ladder2 = rndint(1,14);
-    } while (ladder_in_gap(lev->ladder1, lev->gap) || 
-             ladder_in_gap(lev->ladder2, lev->gap));
+    
     if (i > 0) {
       lev->objtype = rndint(1,4);
       do {
@@ -246,6 +244,80 @@ void make_floors() {
   floors[MAX_FLOORS-1].ladder1 = 0;
   floors[MAX_FLOORS-1].ladder2 = 0;
   floors[MAX_FLOORS-1].objtype = 0;
+  floors[MAX_FLOORS].height =1;
+  
+  floors[1].gap = 1;
+  floors[2].gap = 2;
+  floors[3].gap = 6;
+  floors[4].gap = 3;
+  floors[5].gap = 7;
+  floors[6].gap = 2;
+  floors[7].gap = 9;
+  floors[8].gap = 5;
+  floors[9].gap = 11;
+  floors[10].gap = 3;
+  floors[11].gap = 1;
+  floors[12].gap = 9;
+  floors[13].gap = 6;
+  floors[14].gap = 3;
+  floors[15].gap = 1;
+  floors[16].gap = 1;
+  floors[17].gap = 2;
+  floors[18].gap = 6;
+  floors[19].gap = 3;
+  floors[20].gap = 1;
+  
+  
+  
+  floors[0].ladder1=1;
+  floors[1].ladder1=2;
+  floors[2].ladder1=6;
+  floors[3].ladder1=3;
+  floors[4].ladder1=7;
+  floors[5].ladder1=2;
+  floors[6].ladder1=9;
+  floors[7].ladder1=5;
+  floors[8].ladder1=11;
+  floors[9].ladder1=3;
+  floors[10].ladder1=1;
+  floors[11].ladder1=9;
+  floors[12].ladder1=6;
+  floors[13].ladder1=3;
+  floors[14].ladder1=1;
+  floors[15].ladder1=1;
+  floors[16].ladder1=2;
+  floors[17].ladder1=6;
+  floors[18].ladder1=3;
+  floors[19].ladder1=1;
+  floors[20].ladder1=1;
+  
+  floors[0].ladder2=2;
+  floors[1].ladder2=3;
+  floors[2].ladder2=7;
+  floors[3].ladder2=4;
+  floors[4].ladder2=8;
+  floors[5].ladder2=3;
+  floors[6].ladder2=10;
+  floors[7].ladder2=6;
+  floors[8].ladder2=12;
+  floors[9].ladder2=4;
+  floors[10].ladder2=2;
+  floors[11].ladder2=10;
+  floors[12].ladder2=7;
+  floors[13].ladder2=4;
+  floors[14].ladder2=2;
+  floors[15].ladder2=2;
+  floors[16].ladder2=3;
+  floors[17].ladder2=7;
+  floors[18].ladder2=4;
+  floors[19].ladder2=1;
+  floors[20].ladder2=1;
+  
+  
+ 
+ 
+
+ 
 }
 
 
@@ -306,10 +378,11 @@ void draw_floor_line(byte row_height) {
           buf[lev->ladder2*2+1] = CH_LADDER+1;	// right
         }
         */
+        
       }
      
       // draw object, if it exists
-      /*
+      
       if (lev->objtype) {
         byte ch = lev->objtype*4 + CH_ITEM;
         if (dy == 2) {
@@ -321,7 +394,7 @@ void draw_floor_line(byte row_height) {
           buf[lev->objpos*2+1] = ch+2;	// top-right
         }
       }
-      */
+      
       break;
     }
   }
@@ -418,7 +491,7 @@ typedef struct Actor {
   int onscreen:1;	// is actor onscreen?
 } Actor;
 
-Actor actors[1];	// all actors
+Actor actors[MAX_ACTORS];	// all actors
 
 // creete actors on floor_index, if slot is empty
 void create_actors_on_floor(byte floor_index) {
@@ -427,7 +500,7 @@ void create_actors_on_floor(byte floor_index) {
   if (!a->onscreen) {
     Floor *floor = &floors[floor_index];
     a->state = STANDING;
-    //a->name = ACTOR_ENEMY;
+    a->name = ACTOR_ENEMY;
     a->x = rand8();
     a->yy = get_floor_yy(floor_index);
     a->floor = floor_index;
@@ -463,7 +536,7 @@ void draw_actor(byte i) {
       meta = dir ? playerLStand : playerRStand;
       break;
     case WALKING:
-      meta = playerRunSeq[((a->x >> 1) & 7) + (dir?0:8)];
+      meta = playerRunSeq[((a->x >> 3) & 1) + (dir?0:8)];
       break;
     case JUMPING:
       meta = dir ? playerLJump : playerRJump;
@@ -492,8 +565,14 @@ void draw_actor(byte i) {
 
 // draw the scoreboard, right now just two digits
 void draw_scoreboard() {
-  oam_off = oam_spr(24+0, 24, '0'+(score >> 4), 2, oam_off);
-  oam_off = oam_spr(24+8, 24, '0'+(score & 0xf), 2, oam_off);
+  if(score3!=1)
+  oam_off = oam_spr(24+0, 24, 0x15, 2, oam_off);
+  if(score2!=1)
+  oam_off = oam_spr(24+8, 24, 0x15, 2, oam_off);
+  if(score1!=1)
+  oam_off = oam_spr(24+16, 24, 0x15, 2, oam_off);
+  if(score!=1)
+  oam_off = oam_spr(24+24, 24, 0x15, 2, oam_off);
 }
 
 // draw all sprites
@@ -575,7 +654,7 @@ void move_actor(struct Actor* actor, byte joystick, bool scroll) {
     case WALKING:
       // left/right has priority over climbing
       if (joystick & PAD_A) {
-        actor->state = JUMPING;
+        actor->state = WALKING;
         actor->xvel = 0;
         actor->yvel = JUMP_VELOCITY;
         if (joystick & PAD_LEFT) actor->xvel = -1;
@@ -591,10 +670,10 @@ void move_actor(struct Actor* actor, byte joystick, bool scroll) {
         actor->dir = 0;
         actor->state = WALKING;
       } else if (joystick & PAD_UP) {
-        actor->yy++;
+        //actor->yy++;
         mount_ladder(actor, 0); // state -> CLIMBING
       } else if (joystick & PAD_DOWN) {
-        actor->yy--;
+        //actor->yy--;
         mount_ladder(actor, -1); // state -> CLIMBING, floor -= 1
       } else {
         actor->state = STANDING;
@@ -642,13 +721,15 @@ void move_actor(struct Actor* actor, byte joystick, bool scroll) {
       break;
   }
   // don't allow player to travel past left/right edges of screen
- // if (actor->x > ACTOR_MAX_X) actor->x = ACTOR_MAX_X; // we wrapped around right edge
+  if (actor->x > ACTOR_MAX_X) actor->x = ACTOR_MAX_X; // we wrapped around right edge
   if (actor->x < ACTOR_MIN_X) actor->x = ACTOR_MIN_X;
   // if player lands in a gap, they fall (switch to JUMPING state)
+  /*
   if (actor->state <= WALKING && 
       is_in_gap(actor->x, floors[actor->floor].gap)) {
     fall_down(actor);
   }
+  */
 }
 
 // should we pickup an object? only player does this
@@ -671,7 +752,7 @@ void pickup_object(Actor* actor) {
         vbright = 8; // flash
       } else {
         // we picked up an object, add to score
-        score = bcd_add(score, 1);
+        //score = bcd_add(score, 10);
         sfx_play(SND_COIN,0);
       }
     }
@@ -706,6 +787,19 @@ bool check_collision(Actor* a) {
         afloor == b->floor && 
         iabs(a->yy - b->yy) < 8 && 
         iabs(a->x - b->x) < 8) {
+        if(score2 == 1)
+          {
+            score3 = 1;
+          }
+        if(score1 == 1)
+        {
+          score2 = 1;
+        }
+        if(score == 1)
+        {
+          score1 = 1;
+        }
+         score = 1;
       return true;
     }
   }
@@ -782,7 +876,7 @@ void play_scene() {
     move_player();
     // move all the actors
     for (i=1; i<MAX_ACTORS; i++) {
-      move_actor(&actors[i], rand8(), false);
+      move_actor(&actors[i], rand(), false);
     }
     // see if the player hit another actor
     if (check_collision(&actors[0])) {
