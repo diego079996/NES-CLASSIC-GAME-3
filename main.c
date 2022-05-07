@@ -422,6 +422,102 @@ void draw_floor_line(byte row_height) {
     create_actors_on_floor(floor);
   }
 }
+void draw_floor_line2(byte row_height) {
+  char buf[COLS];	// nametable buffer
+  char attrs[8];	// attribute buffer 
+  byte floor;		// floor counter
+  byte dy;		// height in rows above floor
+  byte rowy;		// row in nametable (0-59)
+  word addr;		// nametable address
+  byte i;		// loop counter
+
+  // loop over all floors
+  for (floor=0; floor<MAX_FLOORS; floor++) {
+    Floor* lev = &floors[floor];
+    // compute height in rows above floor
+    dy = row_height - lev->ypos;
+    // if below bottom floor (in basement)
+    if (dy >= 255 - BOTTOM_FLOOR_Y) dy = 0;
+    // does this floor intersect the desired row?
+    if (dy < lev->height) {
+      // first two rows (floor)?
+      if (dy <= 1) {
+        // iterate through all 32 columns
+        for (i=0; i<COLS; i+=2) {
+          if (dy) {
+            buf[i] = CH_FLOOR+152;		// upper-left
+            buf[i+1] = CH_FLOOR+152;// upper-right
+          } else {
+            buf[i] = CH_FLOOR+170;	// lower-left
+            buf[i+1] = CH_FLOOR+172;	// lower-right
+          }
+        }
+        // is there a gap? if so, clear bytes
+	if (lev->gap)
+          memset(buf+lev->gap*2, 0, GAPSIZE);
+      } else {
+        // clear buffer
+        memset(buf, 0, sizeof(buf));
+        // draw walls
+        if (floor < MAX_FLOORS-1) {
+          buf[0] = CH_FLOOR+44;// left side
+          buf[COLS-1] = CH_FLOOR+44;// right side
+        }
+        // draw ladders
+        /*
+        if (lev->ladder1) {
+          buf[lev->ladder1*2] = CH_LADDER;	// left
+          buf[lev->ladder1*2+1] = CH_LADDER+1;	// right
+        }
+        if (lev->ladder2) {
+          buf[lev->ladder2*2] = CH_LADDER;	// left
+          buf[lev->ladder2*2+1] = CH_LADDER+1;	// right
+        }
+        */
+        
+      }
+     
+      // draw object, if it exists
+      
+      if (lev->objtype) {
+        byte ch = lev->objtype*4 + CH_ITEM;
+        if (dy == 2) {
+          buf[lev->objpos*2] = ch+1;	// bottom-left
+          buf[lev->objpos*2+1] = ch+3;	// bottom-right
+        }
+        else if (dy == 3) {
+          buf[lev->objpos*2] = ch+0;	// top-left
+          buf[lev->objpos*2+1] = ch+2;	// top-right
+        }
+      }
+      
+      break;
+    }
+  }
+  // compute row in name buffer and address
+  rowy = (ROWS-1) - (row_height % ROWS);
+  addr = getntaddr(1, rowy);
+  // copy attribute table (every 4th row)
+  if ((addr & 0x60) == 0) {
+    byte a;
+    if (dy==1)
+      a = 0x05;	// top of attribute block
+    else if (dy==3)
+      a = 0x50;	// bottom of attribute block
+    else
+      a = 0x00;	// does not intersect attr. block
+    // write entire row of attribute blocks
+    memset(attrs, a, 8);
+    vrambuf_put(nt2attraddr(addr), attrs, 8);
+  }
+  // copy line to screen buffer
+  vrambuf_put(addr, buf, COLS);
+  // create actors on this floor, if needed
+  // TODO: maybe this happens too early?
+  if (dy == 0 && (floor >= 2)) {
+    create_actors_on_floor(floor);
+  }
+}
 
 // draw entire stage at current scroll position
 // filling up entire name table
@@ -433,7 +529,14 @@ void draw_entire_stage() {
     vrambuf_flush();
   }
 }
-
+void draw_entire_stage2() {
+  byte y;
+  for (y=0; y<ROWS; y++) {
+    draw_floor_line2(y);
+    // allow buffer to flush, delaying a frame
+    vrambuf_flush();
+  }
+}
 // get Y pixel position for a given floor
 word get_floor_yy(byte floor) {
   return floors[floor].ypos * 8 + 16;
@@ -466,6 +569,11 @@ void refresh_floor(byte floor) {
   byte y = floors[floor].ypos;	// get floor bottom coordinate
   draw_floor_line(y+2);		// redraw 3rd line
   draw_floor_line(y+3);		// redraw 4th line
+}
+void refresh_floor2(byte floor) {
+  byte y = floors[floor].ypos;	// get floor bottom coordinate
+  draw_floor_line2(y+2);		// redraw 3rd line
+  draw_floor_line2(y+3);		// redraw 4th line
 }
 
 ///// ACTORS
@@ -501,7 +609,7 @@ void create_actors_on_floor(byte floor_index) {
     Floor *floor = &floors[floor_index];
     a->state = STANDING;
     a->name = ACTOR_ENEMY;
-    a->x = rand8();
+    a->x = rand16();
     a->yy = get_floor_yy(floor_index);
     a->floor = floor_index;
     a->onscreen = 1;
@@ -731,6 +839,104 @@ void move_actor(struct Actor* actor, byte joystick, bool scroll) {
   }
   */
 }
+void move_actor2(struct Actor* actor, byte joystick, bool scroll) {
+  switch (actor->state) {
+      
+    case STANDING:
+    case WALKING:
+      // left/right has priority over climbing
+     // left/right has priority over climbing
+      if (joystick & PAD_A) {
+        actor->state = WALKING;
+        //actor->xvel = 0;
+        //actor->yvel = JUMP_VELOCITY;
+        if (joystick & PAD_LEFT){ actor->x--; actor->dir = 1;}
+        if (joystick & PAD_RIGHT) 
+        // play sound for player
+        if (scroll) sfx_play(SND_JUMP,0);
+      }
+    /*
+      else if (joystick & PAD_UP) {
+        if (actor->yy <= get_ceiling_yy(actor->floor)) {
+        
+          actor->state = STANDING;
+        } else {
+           actor->yy++;
+      } 
+      }else if (joystick & PAD_DOWN) {
+         if (actor->yy <= get_floor_yy(actor->floor)) {
+          actor->state = STANDING;
+        } else {
+          actor->yy--;
+        }
+      } else {
+        actor->state = STANDING;
+      }
+      if (scroll) {
+        check_scroll_up();
+        check_scroll_down();
+      }
+      */
+      break;
+    case PACING:
+      if(joystick & PAD_RIGHT)
+      {
+	if(actor->x != ACTOR_MAX_X)
+        {
+	  actor->x++;
+          actor->state = WALKING;
+          actor->dir = 0;
+        }
+      }
+      
+    case CLIMBING:
+      if (joystick & PAD_UP) {
+      	if (actor->yy >= get_ceiling_yy(actor->floor)) {
+          //actor->floor++;
+          actor->state = STANDING;
+        } else {
+          actor->yy++;
+        }
+      } else if (joystick & PAD_DOWN) {
+        if (actor->yy <= get_floor_yy(actor->floor)) {
+          actor->state = STANDING;
+        } else {
+          actor->yy--;
+        }
+      }
+      if (scroll) {
+        check_scroll_up();
+        check_scroll_down();
+      }
+      break;
+      
+    case FALLING:
+      if (scroll) {
+        check_scroll_up();
+        check_scroll_down();
+      }
+    case JUMPING:
+      actor->x += actor->xvel;
+      actor->yy += actor->yvel/4;
+      actor->yvel -= 1;
+      if (actor->yy <= get_floor_yy(actor->floor)) {
+	actor->yy = get_floor_yy(actor->floor);
+        actor->state = STANDING;
+      }
+      break;
+      
+  }
+  // don't allow player to travel past left/right edges of screen
+  if (actor->x > ACTOR_MAX_X) actor->x = ACTOR_MAX_X; // we wrapped around right edge
+  if (actor->x < ACTOR_MIN_X) actor->x = ACTOR_MIN_X;
+  // if player lands in a gap, they fall (switch to JUMPING state)
+  /*
+  if (actor->state <= WALKING && 
+      is_in_gap(actor->x, floors[actor->floor].gap)) {
+    fall_down(actor);
+  }
+  */
+}
 
 // should we pickup an object? only player does this
 void pickup_object(Actor* actor) {
@@ -763,6 +969,11 @@ void pickup_object(Actor* actor) {
 void move_player() {
   byte joy = pad_poll(0);
   move_actor(&actors[0], joy, true);
+  pickup_object(&actors[0]);
+}
+void move_player2() {
+  byte joy = pad_poll(0);
+  move_actor2(&actors[0], joy, true);
   pickup_object(&actors[0]);
 }
 
@@ -875,8 +1086,8 @@ void play_scene() {
     refresh_sprites();
     move_player();
     // move all the actors
-    for (i=1; i<MAX_ACTORS; i++) {
-      move_actor(&actors[i], rand(), false);
+    for (i=2; i<MAX_ACTORS; i++) {
+      move_actor2(&actors[i], rand8(), false);
     }
     // see if the player hit another actor
     if (check_collision(&actors[0])) {
@@ -890,7 +1101,45 @@ void play_scene() {
     }
   }
   // player reached goal; reward scene  
-  rescue_scene();
+  //rescue_scene();
+}
+void play_scene2() {
+  byte i;
+  // initialize actors array  
+  memset(actors, 0, sizeof(actors));
+  actors[0].state = STANDING;
+  actors[0].name = ACTOR_PLAYER;
+  actors[0].pal = 3;
+  actors[0].x = 64;
+  actors[0].floor = 0;
+  actors[0].yy = get_floor_yy(0);
+  // put actor at bottom
+  set_scroll_pixel_yy(0);
+  // draw initial view of level into nametable
+  draw_entire_stage2();
+  // repeat until player reaches the roof
+  while (actors[0].floor != MAX_FLOORS-1) {
+    // flush VRAM buffer (waits next frame)
+    vrambuf_flush();
+    refresh_sprites();
+    move_player2();
+    // move all the actors
+    for (i=1; i<MAX_ACTORS; i++) {
+      move_actor2(&actors[i], rand8(), false);
+    }
+    // see if the player hit another actor
+    if (check_collision(&actors[0])) {
+      fall_down(&actors[0]);
+      sfx_play(SND_HIT,0);
+      vbright = 8; // flash
+    }
+    // flash effect
+    if (vbright > 4) {
+      pal_bright(--vbright);
+    }
+  }
+  // player reached goal; reward scene  
+  //rescue_scene();
 }
 
 /*{pal:"nes",layout:"nes"}*/
@@ -1019,7 +1268,12 @@ void main() {
     //sfx_play(SND_START,0);	// play starting sound
     make_floors();		// make random level
     //music_play(0);		// start the music
-    play_scene();		// play the level
+    play_scene();// play the level
+  }
+  while (2) {
+        setup_graphics();
+  	make_floors();
+  	play_scene2();
   }
 }
 
