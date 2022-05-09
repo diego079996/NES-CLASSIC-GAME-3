@@ -80,6 +80,7 @@ const unsigned char palTitle[16]={ 0x0f,0x07,0x38,0x38,0x0f,0x27,0x29,0x39,0x0f,
 ///// GLOBALS
 static int i;
 static int iy,dy;
+static int ct;
 static unsigned char wait;
 static unsigned char frame_cnt;
 static unsigned char bright;
@@ -829,8 +830,8 @@ void move_actor(struct Actor* actor, byte joystick, bool scroll) {
       break;
   }
   // don't allow player to travel past left/right edges of screen
-  if (actor->x > ACTOR_MAX_X) actor->x = ACTOR_MAX_X; // we wrapped around right edge
-  if (actor->x < ACTOR_MIN_X) actor->x = ACTOR_MIN_X;
+  //if (actor->x > ACTOR_MAX_X) actor->x = ACTOR_MAX_X; // we wrapped around right edge
+  //if (actor->x < ACTOR_MIN_X) actor->x = ACTOR_MIN_X;
   // if player lands in a gap, they fall (switch to JUMPING state)
   /*
   if (actor->state <= WALKING && 
@@ -840,21 +841,37 @@ void move_actor(struct Actor* actor, byte joystick, bool scroll) {
   */
 }
 void move_actor2(struct Actor* actor, byte joystick, bool scroll) {
+
   switch (actor->state) {
       
     case STANDING:
     case WALKING:
       // left/right has priority over climbing
      // left/right has priority over climbing
-      if (joystick & PAD_A) {
-        actor->state = WALKING;
-        //actor->xvel = 0;
-        //actor->yvel = JUMP_VELOCITY;
-        if (joystick & PAD_LEFT){ actor->x--; actor->dir = 1;}
-        if (joystick & PAD_RIGHT) 
+   
+     if (joystick & PAD_LEFT)
+        {     
+          if(actor->x > ACTOR_MIN_X & ct < 1){
+             ct = 0;
+             actor->state = WALKING;
+             actor->x--; 
+             actor->dir = 1; 
+          }
+          else if (joystick & PAD_RIGHT){
+            ct = 1;
+            actor->x++;
+            actor->dir =0;
+          }
+          if(actor->x == ACTOR_MAX_X){
+            ct = 0;
+            actor->x++;
+            actor->dir =0;
+          }
+     }
+        
         // play sound for player
-        if (scroll) sfx_play(SND_JUMP,0);
-      }
+        //if (scroll) sfx_play(SND_JUMP,0);
+      
     /*
       else if (joystick & PAD_UP) {
         if (actor->yy <= get_ceiling_yy(actor->floor)) {
@@ -876,19 +893,8 @@ void move_actor2(struct Actor* actor, byte joystick, bool scroll) {
         check_scroll_up();
         check_scroll_down();
       }
-      */
+     */
       break;
-    case PACING:
-      if(joystick & PAD_RIGHT)
-      {
-	if(actor->x != ACTOR_MAX_X)
-        {
-	  actor->x++;
-          actor->state = WALKING;
-          actor->dir = 0;
-        }
-      }
-      
     case CLIMBING:
       if (joystick & PAD_UP) {
       	if (actor->yy >= get_ceiling_yy(actor->floor)) {
@@ -1125,7 +1131,7 @@ void play_scene2() {
     move_player2();
     // move all the actors
     for (i=1; i<MAX_ACTORS; i++) {
-      move_actor2(&actors[i], rand8(), false);
+      move_actor2(&actors[i], rand16(), false);
     }
     // see if the player hit another actor
     if (check_collision(&actors[0])) {
@@ -1153,8 +1159,8 @@ const char PALETTE[32] = {
 
   0x16,0x35,0x24, 0x00,	// enemy sprites
   0x00,0x37,0x25, 0x00,	// rescue person
-  0x0D,0x2D,0x3A, 0x00,
-  0x0D,0x27,0x2A	// player sprites
+  0x0D,0x11,0x3A, 0x00,
+  0x37,0x27,0x2A	// player sprites
 };
 
 
